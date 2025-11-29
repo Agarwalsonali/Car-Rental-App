@@ -1,8 +1,8 @@
 const db = require('../db/index.js');
-const ImageKit = require('@imagekit/nodejs');
+const ImageKit = require('imagekit');
 const fs = require('fs')
 
-// Your ImageKit config
+
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
@@ -26,7 +26,8 @@ function getOrCreateId(table, nameField, value, callback) {
 }
 
 // addCar
-const addCar = (req, res) => {
+
+const addCar = async (req, res) => {
   try {
     const {
       brand,
@@ -41,58 +42,50 @@ const addCar = (req, res) => {
       description
     } = req.body;
 
-    const owner_id = req.user.id;
+    console.log("Received Body:", req.body);
 
-    if (!brand || !model || !year || !pricePerDay || !category) {
+
+    const owner_id = req.user.id || req.user._id;
+
+    if ([brand, model, year, pricePerDay, category].some(v => v === undefined || v === null || v === "")) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // -------------------------------------
-    //  HANDLE IMAGE UPLOAD WITH IMAGEKIT
-    // -------------------------------------
 
     let imageUrl = null;
 
     if (req.file) {
       const filePath = req.file.path;
 
-      const uploaded = imagekit.upload({
-        file: fs.readFileSync(filePath),
+      const uploaded = await imagekit.upload({
+        file: fs.readFileSync(filePath, { encoding: "base64" }),
         fileName: req.file.originalname,
         folder: "/cars"
       });
 
-      // After upload, generate optimized URL
       imageUrl = imagekit.url({
         src: uploaded.url,
         transformation: [
-          {
-            width: "1280",
-            quality: "auto",
-            format: "webp"
-          }
+          { width: "1280" },
+          { quality: "auto" },
+          { format: "webp" }
         ]
       });
 
-      // Remove file from server after uploading to ImageKit
-      fs.unlinkSync(filePath);
+      // Remove local file
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        console.warn("Failed to remove temp file:", err.message);
+      }
     }
 
-    // -------------------------------------
-    //  GET OR CREATE BRAND ID
-    // -------------------------------------
     getOrCreateId("brand", "brand_name", brand, (err, brandId) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // -------------------------------------
-      //  GET OR CREATE MODEL ID
-      // -------------------------------------
       getOrCreateId("models", "model_name", model, (err2, modelId) => {
         if (err2) return res.status(500).json({ error: err2.message });
 
-        // -------------------------------------
-        //  INSERT CAR INTO DATABASE
-        // -------------------------------------
         const sql = `
           INSERT INTO cars (
             owner_id, brand_id, model_id, year, category, seating_capacity,
@@ -143,8 +136,8 @@ const getCars = (req, res) => {
   const query = `
     SELECT 
       c.car_id,
-      b.brand_name,
-      m.model_name,
+      b.brand_name AS brand,
+      m.model_name AS model,
       c.image,
       c.year,
       c.category,
@@ -157,18 +150,25 @@ const getCars = (req, res) => {
       c.is_available,
       c.created_at
     FROM cars c
-    JOIN brand b ON c.brand_id = b.brand_id
-    JOIN models m ON c.model_id = m.model_id
+    LEFT JOIN brand b ON c.brand_id = b.brand_id
+    LEFT JOIN models m ON c.model_id = m.model_id
+    WHERE c.is_available = 1
   `;
 
   db.query(query, (err, results) => {
     if (err) {
       console.error("Error fetching cars:", err);
-      return res.status(500).json({ error: "Database query failed" });
+      return res.json({ success: false, message: "Database query failed" });
     }
-    res.json(results);
+
+    return res.json({
+      success: true,
+      cars: results
+    });
   });
 };
+
+
 
 // Get car by ID
  const getCarById = (req, res) => {
@@ -190,7 +190,7 @@ const getCars = (req, res) => {
       c.price_per_day AS pricePerDay, 
       c.location, 
       c.description, 
-      c.is_available AS isAvailable, 
+      c.is_available AS is_available, 
       c.created_at AS createdAt
     FROM cars c
     JOIN brand b ON c.brand_id = b.brand_id
@@ -219,7 +219,6 @@ const toggleCarAvailability = (req, res) => {
     const owner_id = req.user.id;
     const { carId } = req.body;
 
-    // Step 1: Fetch car from DB
     const selectQuery = "SELECT * FROM cars WHERE car_id = ?";
     db.query(selectQuery, [carId], (err, results) => {
       if (err) {
@@ -233,12 +232,11 @@ const toggleCarAvailability = (req, res) => {
 
       const car = results[0];
 
-      // Step 2: Check if this car belongs to the user
-      if (car.owner_id !== owner_id) {
+      
+      if (String(car.owner_id) !== String(owner_id)) {
         return res.json({ success: false, message: "Unauthorized" });
       }
 
-      // Step 3: Toggle availability
       const newAvailability = car.is_available ? 0 : 1;
 
       const updateQuery = `
@@ -253,7 +251,6 @@ const toggleCarAvailability = (req, res) => {
           return res.json({ success: false, message: err2.message });
         }
 
-        // Step 4: Return updated car
         const updatedCar = { ...car, is_available: newAvailability };
 
         res.json({
@@ -268,6 +265,7 @@ const toggleCarAvailability = (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
 
 
 // Delete car
@@ -293,9 +291,12 @@ const removeCarOwner = (req, res) => {
     const owner_id = req.user.id;
     const { carId } = req.body;
 
-    // Step 1: Get car details
-    const selectQuery = "SELECT * FROM cars WHERE car_id = ?";
+    if (!carId) {
+      return res.json({ success: false, message: "carId is required" });
+    }
 
+   
+    const selectQuery = "SELECT * FROM cars WHERE car_id = ?";
     db.query(selectQuery, [carId], (err, results) => {
       if (err) {
         console.log(err);
@@ -308,13 +309,16 @@ const removeCarOwner = (req, res) => {
 
       const car = results[0];
 
-      // Step 2: Check if user is the owner
-      if (car.owner_id !== owner_id) {
+      if (String(car.owner_id) !== String(owner_id)) {
         return res.json({ success: false, message: "Unauthorized: Not your car" });
       }
 
-      // Step 3: Remove owner (set owner_id = NULL)
-      const updateQuery = "UPDATE cars SET owner_id = NULL WHERE car_id = ?";
+     
+      const updateQuery = `
+        UPDATE cars 
+        SET owner_id = NULL 
+        WHERE car_id = ?
+      `;
 
       db.query(updateQuery, [carId], (err2) => {
         if (err2) {
@@ -324,7 +328,7 @@ const removeCarOwner = (req, res) => {
 
         res.json({
           success: true,
-          message: "Owner removed from car successfully"
+          message: "Car removed from your ownership"
         });
       });
     });

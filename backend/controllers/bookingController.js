@@ -12,7 +12,7 @@ function checkAvailability(car_id, pickupDate, returnDate, callback) {
 
     db.query(sql, [car_id, returnDate, pickupDate], function (err, results) {
         if (err) return callback(err);
-        // available → no overlapping booking found
+        
         callback(null, results.length === 0);
     });
 }
@@ -23,8 +23,8 @@ function checkAvailability(car_id, pickupDate, returnDate, callback) {
 const checkAvailabilityOfCar = (req, res) => {
     const { location, pickupDate, returnDate } = req.body;
 
-    // Step 1: get all cars for that location
-    const sql = "SELECT * FROM cars WHERE location = ? AND isAvailable = 1";
+   
+    const sql = "SELECT * FROM cars WHERE location = ? AND is_available = 1";
 
     db.query(sql, [location], function (err, cars) {
         if (err) return res.json({ success: false, message: err.message });
@@ -32,27 +32,27 @@ const checkAvailabilityOfCar = (req, res) => {
         let availableCars = [];
         let processed = 0;
 
-        // If no cars:
+        
         if (cars.length === 0) {
             return res.json({ success: true, availableCars: [] });
         }
 
-        // Step 2: check each car availability
+   
         cars.forEach(car => {
 
-            checkAvailability(car.id, pickupDate, returnDate, function (err, isAvailable) {
+            checkAvailability(car.car_id, pickupDate, returnDate, function (err, is_available) {
                 if (err) return res.json({ success: false, message: err.message });
 
-                if (isAvailable) {
+                if (is_available) {
                     availableCars.push({
                         ...car,
-                        isAvailable: true
+                        is_available: true
                     });
                 }
 
                 processed++;
 
-                // When all cars processed, return result
+               
                 if (processed === cars.length) {
                     res.json({ success: true, availableCars });
                 }
@@ -66,26 +66,23 @@ const checkAvailabilityOfCar = (req, res) => {
 
 // API to Create Booking
 const createBooking = (req, res) => {
-    const { _id } = req.user;
+    const userId = req.user.id;  
     const { car, pickupDate, returnDate } = req.body;
 
-    // Step 1: use checkAvailability() function
-    checkAvailability(car, pickupDate, returnDate, function (err, isAvailable) {
+    checkAvailability(car, pickupDate, returnDate, function (err, is_available) {
 
         if (err) {
             console.log(err);
             return res.json({ success: false, message: err.message });
         }
 
-        if (!isAvailable) {
+        if (!is_available) {
             return res.json({ success: false, message: "Car is not available" });
         }
 
-        // Step 2: fetch car details
         const sqlCar = `SELECT * FROM cars WHERE car_id = ?`;
 
         db.query(sqlCar, [car], function (err, carRows) {
-
             if (err) {
                 console.log(err);
                 return res.json({ success: false, message: err.message });
@@ -97,7 +94,6 @@ const createBooking = (req, res) => {
 
             const carData = carRows[0];
 
-            // Step 3: calculate price
             const picked = new Date(pickupDate);
             const returned = new Date(returnDate);
 
@@ -107,7 +103,6 @@ const createBooking = (req, res) => {
 
             const price = carData.price_per_day * noOfDays;
 
-            // Step 4: insert booking
             const sqlInsert = `
                 INSERT INTO bookings
                 (car_id, owner_id, user_id, pickup_date, return_date, price)
@@ -116,16 +111,14 @@ const createBooking = (req, res) => {
 
             db.query(
                 sqlInsert,
-                [car, carData.owner_id, _id, pickupDate, returnDate, price],
+                [car, carData.owner_id, userId, pickupDate, returnDate, price], // FIXED
                 function (err) {
-
                     if (err) {
                         console.log(err);
                         return res.json({ success: false, message: err.message });
                     }
 
-                    // Step 5: response
-                    res.json({
+                    return res.json({
                         success: true,
                         message: "Booking Created"
                     });
@@ -138,26 +131,32 @@ const createBooking = (req, res) => {
 
 //API to list user bookings
 const getUserBookings = (req, res) => {
-    const { _id } = req.user;
+    const user_id = req.user.id;
 
     const sql = `
-        SELECT b.*, c.*
+        SELECT 
+            b.booking_id, b.car_id, b.user_id, b.owner_id,
+            b.pickup_date, b.return_date, b.status, b.price, 
+            b.created_at, b.updated_at,
+
+            c.image, c.year, c.category, c.location,
+
+            b_tbl.brand_name,
+            m_tbl.model_name
+
         FROM bookings b
         JOIN cars c ON b.car_id = c.car_id
+        JOIN brand b_tbl ON c.brand_id = b_tbl.brand_id
+        JOIN models m_tbl ON c.model_id = m_tbl.model_id
+
         WHERE b.user_id = ?
         ORDER BY b.created_at DESC
     `;
 
-    db.query(sql, [_id], function (err, bookings) {
-        if (err) {
-            console.log(err);
-            return res.json({ success: false, message: err.message });
-        }
+    db.query(sql, [user_id], function (err, bookings) {
+        if (err) return res.json({ success: false, message: err.message });
 
-        res.json({
-            success: true,
-            bookings
-        });
+        res.json({ success: true, bookings });
     });
 };
 
@@ -166,25 +165,23 @@ const getUserBookings = (req, res) => {
 //API to list owner bookings
 const getOwnerBookings = (req, res) => {
 
-    // Step 0: Check owner role
+    console.log("Decoded user:", req.user);
+
     if (req.user.role !== 'owner') {
         return res.json({ success: false, message: "Unauthorized" });
     }
 
-    const ownerId = req.user._id;
+    const ownerId = req.user.id;  
 
-    // Step 1: MySQL query to get all bookings of this owner
-    // Populate equivalent:
-    // JOIN cars → get car details
-    // JOIN users → get customer details
-    // Do NOT select password
+
+
     const sql = `
         SELECT 
             b.*, 
             c.*, 
             u.user_id AS booking_user_id,
-            u.firstName AS user_firstname,
-            u.lastName AS user_lastname,
+            u.fname AS user_firstname,
+            u.lname AS user_lastname,
             u.email AS user_email
         FROM bookings b
         JOIN cars c ON b.car_id = c.car_id
@@ -199,7 +196,7 @@ const getOwnerBookings = (req, res) => {
             return res.json({ success: false, message: err.message });
         }
 
-        // Step 2: Send response
+      
         res.json({
             success: true,
             bookings
@@ -211,10 +208,9 @@ const getOwnerBookings = (req, res) => {
 
 //API to change booking status
 const changeBookingStatus = (req, res) => {
-    const { _id } = req.user; // owner ID
+    const ownerId = req.user.id;   
     const { bookingId, status } = req.body;
 
-    // Step 1 → Fetch booking row
     const sqlFind = `
         SELECT * FROM bookings WHERE booking_id = ?
     `;
@@ -231,15 +227,13 @@ const changeBookingStatus = (req, res) => {
 
         const booking = rows[0];
 
-        // Step 2 → Verify owner authorization
-        if (booking.owner_id != _id) {
+        if (booking.owner_id != ownerId) {   
             return res.json({
                 success: false,
                 message: "Unauthorized"
             });
         }
 
-        // Step 3 → Update status
         const sqlUpdate = `
             UPDATE bookings 
             SET status = ?
@@ -252,7 +246,6 @@ const changeBookingStatus = (req, res) => {
                 return res.json({ success: false, message: err.message });
             }
 
-            // Step 4 → Success
             res.json({
                 success: true,
                 message: "Booking status updated"
@@ -260,6 +253,7 @@ const changeBookingStatus = (req, res) => {
         });
     });
 };
+
 
 
 module.exports = {

@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import Title from '../../components/owner/Title'
 import { assets } from '../../assets/assets'
-import axios from "axios";
+import { useAppContext } from '../../context/AppContext';
+import { toast } from 'react-toastify';
 
 const AddCar = () => {
 
-  const currency = import.meta.env.VITE_CURRENCY;
+  const {axios, currency} = useAppContext()
+
   const [image, setImage] = useState(null)
   const [car,setCar] = useState({
     brand: '',
@@ -20,48 +22,51 @@ const AddCar = () => {
     description: ''
   })
 
+  const [isLoading, setIsLoading] = useState(false)
+
   const onSubmitHandler = async (e) => {
   e.preventDefault();
+  if(isLoading) return null;
+
+  setIsLoading(true)
 
   try {
+    if (!car.brand || !car.model || !car.year || !car.pricePerDay || !car.category) {
+      toast.error("Please fill all required fields");
+      return;
+    }
     const formData = new FormData();
-    formData.append("brand", car.brand);
-    formData.append("model", car.model);
-    formData.append("year", car.year);
-    formData.append("pricePerDay", car.pricePerDay);
-    formData.append("category", car.category);
-    formData.append("transmission", car.transmission);
-    formData.append("fuel_type", car.fuel_type);
-    formData.append("seating_capacity", car.seating_capacity);
-    formData.append("location", car.location);
-    formData.append("description", car.description);
-    if (image) formData.append("image", image);
+    if (image instanceof File) {
+      formData.append("image", image);
+    }
+    Object.keys(car).forEach(key => {
+      formData.append(key, car[key]);
+    });
 
-    const res = await axios.post("http://localhost:3000/api/cars", formData, {
-      headers: { 
-      "Content-Type": "multipart/form-data",
-      "Authorization": `${localStorage.getItem("token")}`
+    const { data } = await axios.post("/api/owner/add-car", formData)
+
+    if(data.success){
+      toast.success(data.message)
+      setImage(null)
+      setCar({
+        brand: '',
+        model: '',
+        year: 0,
+        pricePerDay: 0,
+        category: '',
+        transmission: '',
+        fuel_type: '',
+        seating_capacity:0,
+        location: '',
+        description: ''
+      })
+      } else{
+        toast.error(data.message)
       }
-    });
-
-    alert("✅ " + res.data.message);
-    // Reset form
-    setCar({
-      brand: '',
-      model: '',
-      year: 0,
-      pricePerDay: 0,
-      category: '',
-      transmission: '',
-      fuel_type: '',
-      seating_capacity: 0,
-      location: '',
-      description: ''
-    });
-    setImage(null);
-  } catch (error) {
-    console.error("Error adding car:", error);
-    alert("Failed to add car");
+  } catch(error){
+    toast.error(error.message)
+  } finally{
+    setIsLoading(false)
   }
 };
 
@@ -168,7 +173,7 @@ const AddCar = () => {
 
         <button className='flex items-center gap-2 px-4 py-2.5 mt-4 bg-primary text-white rounded-md font-medium w-max cursor-pointer'>
           <img src={assets.tick_icon} alt='' />
-          List Your Car
+          { isLoading ? 'Listing...' : 'List Your Car'}
         </button>
       </form>
     </div>

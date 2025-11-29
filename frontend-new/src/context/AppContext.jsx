@@ -32,7 +32,8 @@ export const AppProvider = ({children}) =>{
                 setUser(data.user)
                 setIsOwner(data.user.role === 'owner')
             }else{
-                nav('/')
+                setUser(null)
+                setIsOwner(false)
             }
         }catch(error){
             toast.error(error.message)
@@ -42,7 +43,7 @@ export const AppProvider = ({children}) =>{
     //Fucntion to fetch all cars from the server
     const fetchCars = async ()=>{
         try{
-            const {data} = await axios.get('/api/user/cars')
+            const {data} = await axios.get('/api/cars')
             data.success ? setCars(data.cars) : toast.error(data.message)
         }catch (error){
             toast.error(error.message)

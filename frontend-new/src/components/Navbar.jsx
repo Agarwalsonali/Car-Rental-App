@@ -3,6 +3,7 @@ import { assets } from "../assets/assets";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { useAppContext } from "../context/AppContext";
+import { motion } from "motion/react";
 
 export default function Navbar() {
 
@@ -12,22 +13,37 @@ export default function Navbar() {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   
-  const changeRole = async ()=>{
-    try{
-      const {data} = await axios.post('/api/owner/change-role')
-      if(data.success){
-        setIsOwner(true)
-        toast.success(data.message)
-      }else{
-        toast.error(data.message)
+  const changeRole = async () => {
+  try {
+    const { data } = await axios.post('/api/owner/change-role');
+
+    if (data.success) {
+
+      if (data.token) {
+        localStorage.setItem("token", data.token);
       }
-    } catch(error){
-      toast.error(error.message)
+
+      toast.success(data.message);
+
+      setIsOwner(true);
+
+      window.location.reload();
+      
+    } else {
+      toast.error(data.message);
     }
+
+  } catch (error) {
+    toast.error(error.message);
   }
+};
+
 
   return (
-    <div
+    <motion.div
+      initial={{y: -20, opacity: 0}}
+      animate={{y: 0, opacity: 1}}
+      transition={{duration: 0.5}}
       className={`px-6 flex justify-between items-center md:px-16 lg:px-24 xl:px-32 py-4 text-gray-600 border-b border-borderColor relative transition-all ${
         location.pathname === "/" && "bg-light"
       }`}
@@ -37,7 +53,7 @@ export default function Navbar() {
         to="/"
         className="text-2xl font-bold from-blue-600 to-indigo-500 text-transparent bg-clip-text"
       >
-        <img src={assets.logo} alt="logo" className="h-8" />
+        <motion.img whileHover={{scale: 1.05}} src={assets.logo} alt="logo" className="h-8" />
       </Link>
 
       {/* Links */}
@@ -52,11 +68,9 @@ export default function Navbar() {
         <Link to="/cars" className="hover:text-primary font-medium">
           Cars
         </Link>
-        {isLoggedIn && (
-          <Link to="/bookings" className="hover:text-primary font-medium">
-            My Bookings
-          </Link>
-        )}
+        <Link to="/my-bookings" className="hover:text-primary font-medium">
+          My Bookings
+        </Link>
 
         {/* Search bar */}
         <div className="hidden lg:flex items-center text-sm gap-2 border border-borderColor px-3 rounded-full max-w-56">
@@ -80,7 +94,7 @@ export default function Navbar() {
 
               <button
                 onClick={()=> {user ? logout() : setShowLogin(true)}}
-                className="cursor-pointer px-8 py-2 bg-red-500 hover:bg-red-600 transition-all text-white rounded-lg"
+                className={user ? "cursor-pointer px-8 py-2 bg-red-500 hover:bg-red-600 transition-all text-white rounded-lg": "cursor-pointer px-8 py-2 bg-blue-500 hover:bg-blue-600 transition-all text-white rounded-lg"}
               >
                 {user ? 'Logout' : 'Login'}
               </button>
@@ -100,6 +114,6 @@ export default function Navbar() {
           className="w-6 h-6"
         />
       </button>
-    </div>
+    </motion.div>
   );
 }

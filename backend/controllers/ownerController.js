@@ -1,92 +1,114 @@
 const db = require('../db/index.js');
 const fs = require('fs')
-const ImageKit = require('@imagekit/nodejs');
+const ImageKit = require("imagekit");
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv')
 
-const changeRoleToOwner = async (req, res) => {
-  try {
-    const user_id = req.user; // you stored logged-in user's id in req.user
+dotenv.config();
 
-    const sql = `UPDATE users SET role = 'owner' WHERE user_id = ?`;
+const imagekit = new ImageKit({
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+});
 
-    db.query(sql, [user_id], (err, result) => {
-      if (err) {
-        console.log(err.message);
-        return res.json({ success: false, message: err.message });
-      }
 
-      // result.affectedRows tells if update happened
-      if (result.affectedRows === 0) {
-        return res.json({
-          success: false,
-          message: "User not found",
+const changeRoleToOwner = (req, res) => {
+    const user_id = req.user.id;
+
+    const updateSql = "UPDATE users SET role = 'owner' WHERE user_id = ?";
+
+    db.query(updateSql, [user_id], (err) => {
+        if (err) {
+            console.log(err);
+            return res.json({ success: false, message: err.message });
+        }
+
+
+        const newToken = jwt.sign(
+            { id: user_id, email: req.user.email, role: "owner" },
+            process.env.JWT_SECRET,
+            { expiresIn: "2h" }
+        );
+
+        res.json({
+            success: true,
+            message: "Role updated to owner",
+            token: newToken
         });
-      }
-
-      return res.json({
-        success: true,
-        message: "Now you can list cars",
-      });
     });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
 };
+
 
 const getOwnerCars = (req, res) => {
   try {
-    const owner_id = req.user.id;
+    const owner_id = req.user.id;  
 
     const query = `
       SELECT 
-        cars.*, 
+        cars.car_id,
+        cars.image,
+        cars.year,
+        cars.category,
+        cars.seating_capacity,
+        cars.fuel_type,
+        cars.transmission,
+        cars.price_per_day,
+        cars.location,
+        cars.description,
+        cars.is_available,
+        cars.created_at,
+
         brand.brand_name,
         models.model_name
+
       FROM cars
-      LEFT JOIN brand ON cars.brand_id = brand.id
-      LEFT JOIN models ON cars.model_id = models.id
+      LEFT JOIN brand 
+        ON cars.brand_id = brand.brand_id
+      LEFT JOIN models 
+        ON cars.model_id = models.model_id
       WHERE cars.owner_id = ?
+      ORDER BY cars.car_id DESC
     `;
 
     db.query(query, [owner_id], (err, results) => {
       if (err) {
-        console.log(err.message);
+        console.log("SQL Error:", err.message);
         return res.json({ success: false, message: err.message });
       }
 
-      res.json({
+      return res.json({
         success: true,
         cars: results
       });
     });
 
   } catch (error) {
-    console.log(error.message);
+    console.log("Controller Error:", error.message);
     res.json({ success: false, message: error.message });
   }
-}
+};
 
 
 const getDashboardData = (req, res) => {
-    const { _id, role } = req.user;
+    const { id, role } = req.user; 
 
-    // Step 0 — Authorization
     if (role !== 'owner') {
         return res.json({ success: false, message: "Unauthorized" });
     }
 
-    // Step 1 — Fetch cars owned by this owner
+  
     const sqlCars = `
         SELECT * FROM cars WHERE owner_id = ?
     `;
 
-    db.query(sqlCars, [_id], function (err, cars) {
+    db.query(sqlCars, [id], function (err, cars) {
         if (err) {
             console.log(err);
             return res.json({ success: false, message: err.message });
         }
 
-        // Step 2 — Fetch bookings (JOIN to get car info)
+      
         const sqlBookings = `
             SELECT b.*, c.*
             FROM bookings b
@@ -95,101 +117,86 @@ const getDashboardData = (req, res) => {
             ORDER BY b.created_at DESC
         `;
 
-        db.query(sqlBookings, [_id], function (err, bookings) {
+        db.query(sqlBookings, [id], function (err, bookings) {
             if (err) {
                 console.log(err);
                 return res.json({ success: false, message: err.message });
             }
 
-            // Step 3 — Pending and Completed
-            const pendingBookings = bookings.filter(
-                b => b.status === "pending"
-            );
+            const pendingBookings = bookings.filter(b => b.status === "pending");
+            const completedBookings = bookings.filter(b => b.status === "confirmed");
+            const monthlyRevenue = completedBookings.reduce((sum, b) => sum + b.price, 0);
 
-            const completedBookings = bookings.filter(
-                b => b.status === "confirmed"
-            );
+            const recentBookings = bookings.slice(0, 3).map(b => ({
+                ...b,
+                car: { 
+                    brand: b.brand_name || b.brand,
+                    model: b.model_name || b.model
+                }
+            }));
 
-            // Step 4 — Monthly Revenue
-            const monthlyRevenue = completedBookings.reduce(
-                (acc, b) => acc + b.price,
-                0
-            );
-
-            // Step 5 — Recent Bookings (Top 3)
-            const recentBookings = bookings.slice(0, 3);
-
-            // Step 6 — Dashboard Object
-            const dashboardData = {
-                totalCars: cars.length,
-                totalBookings: bookings.length,
-                pendingBookings: pendingBookings.length,
-                completedBookings: completedBookings.length,
-                recentBookings,
-                monthlyRevenue
-            };
-
-            res.json({ success: true, dashboardData });
+            return res.json({
+                success: true,
+                dashboardData: {
+                    totalCars: cars.length,
+                    totalBookings: bookings.length,
+                    pendingBookings: pendingBookings.length,
+                    completedBookings: completedBookings.length,
+                    recentBookings,
+                    monthlyRevenue
+                }
+            });
         });
     });
 };
 
 
+
 //API to update user image
-const updateUserImage = (req, res) => {
-    const { _id } = req.user;
-    const imageFile = req.file;
 
-    // Read file buffer
-    const fileBuffer = fs.readFileSync(imageFile.path);
+const updateUserImage = async (req, res) => {
+    try {
+        const user_id = req.user.id;
 
-    // Upload to ImageKit (callback version)
-    ImageKit.upload(
-        {
-            file: fileBuffer,
-            fileName: imageFile.originalname,
-            folder: "/users",
-        },
-        function (err, response) {
-            if (err) {
-                console.log(err);
-                return res.json({ success: false, message: err.message });
-            }
-
-            // Optimize transformed URL
-            const optimizedImageUrl = imagekit.url({
-                path: response.filePath,
-                transformation: [
-                    { width: "400" },     // resize
-                    { quality: "auto" },  // auto compress
-                    { format: "webp" },   // convert to webp
-                ],
-            });
-
-            // Update user image in MySQL
-            const sql = `
-                UPDATE users 
-                SET image = ? 
-                WHERE user_id = ?
-            `;
-
-            db.query(sql, [optimizedImageUrl, _id], function (err) {
-                if (err) {
-                    console.log(err);
-                    return res.json({ success: false, message: err.message });
-                }
-
-                // Success response
-                res.json({
-                    success: true,
-                    message: "Image Updated",
-                    image: optimizedImageUrl,
-                });
-            });
+        if (!req.file) {
+            return res.json({ success: false, message: "No image uploaded" });
         }
-    );
-};
 
+        const filePath = req.file.path;
+
+        const uploaded = await imagekit.upload({
+            file: fs.readFileSync(filePath, { encoding: 'base64' }),
+            fileName: req.file.originalname,
+            folder: "/users"
+        });
+
+        // use uploaded to build optimizedUrl
+            
+
+                const optimizedUrl = imagekit.url({
+                    src: uploaded.url,
+                    transformation: [{ width: "400" }, { quality: "auto" }, { format: "webp" }]
+                });
+
+                const sql = "UPDATE users SET image = ? WHERE user_id = ?";
+
+                db.query(sql, [optimizedUrl, user_id], (err) => {
+                    if (err) {
+                        console.log(err);
+                        return res.json({ success: false, message: err.message });
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "Image updated successfully",
+                        image: optimizedUrl
+                    });
+                });
+            }catch (error) {
+              console.log(error);
+              res.json({ success: false, message: error.message });
+    }
+};
 
 module.exports = {
     changeRoleToOwner,

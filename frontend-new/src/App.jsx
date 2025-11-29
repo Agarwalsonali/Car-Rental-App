@@ -13,7 +13,7 @@ import AddCar from "./pages/owner/AddCar";
 import ManageCars from "./pages/owner/ManageCars";
 import ManageBookings from "./pages/owner/ManageBookings";
 import Login from "./components/Login";
-import { ToastContainer  } from "react-toastify";
+import { ToastContainer, toast} from "react-toastify";
 import { useAppContext } from "./context/AppContext";
 
 export default function App(){
@@ -23,7 +23,12 @@ export default function App(){
 
   return (
     <div className="min-h-screen">
-      < ToastContainer />
+      <ToastContainer   
+          position="top-right"
+          autoClose={3000}
+          pauseOnHover
+          style={{ zIndex: 999999999 }}   // <-- Highest z-index
+/>
       
       {showLogin && <Login />}
       
@@ -33,7 +38,7 @@ export default function App(){
           <Route path="/" element={<Home/>}/>
           <Route path="/car-details/:id" element={<CarDetails/>}/>
           <Route path="/cars" element={<Cars/>}/>
-          <Route path="/bookings" element={<MyBookings/>}/>
+          <Route path="/my-bookings" element={<MyBookings/>}/>
           <Route path="/owner" element={<Layout />} >
             <Route index element={<Dashboard />} />
             <Route path="add-car" element={<AddCar />} />

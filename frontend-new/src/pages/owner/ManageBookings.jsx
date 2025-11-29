@@ -1,39 +1,37 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Title from "../../components/owner/Title";
+import { useAppContext } from "../../context/AppContext";
+import { toast } from "react-toastify";
 
 const ManageBookings = () => {
-  const [bookings, setBookings] = useState([]);
-  const currency = import.meta.env.VITE_CURRENCY || "$";
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
-  // get owner id (assume logged in)
-  const ownerId = localStorage.getItem("owner_id");
+  const { currency, axios} = useAppContext() 
+
+  const [bookings, setBookings] = useState([]);
 
   // Fetch all bookings for cars owned by this owner
   const fetchOwnerBookings = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/bookings/owner/${ownerId}`);
-      setBookings(res.data);
+      const { data } = await axios.get('/api/owner/bookings')
+      data.success ? setBookings(data.bookings) : toast.error(data.message)
     } catch (error) {
-      console.error("Error fetching bookings:", error);
+      toast.error(error.message)
     }
   };
 
   // Update booking status (approve or cancel)
-  const updateBookingStatus = async (bookingId, newStatus) => {
+  const changeBookingStatus = async (bookingId, status) => {
     try {
-      await axios.put(`${API_BASE}/api/bookings/${bookingId}`, {
-        status: newStatus,
-      });
-
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.booking_id === bookingId ? { ...b, status: newStatus } : b
-        )
-      );
+      const { data } = await axios.put('/api/owner/change-status', { bookingId, status })
+      if(data.success){
+        toast.success(data.message)
+        fetchOwnerBookings()
+      }else{
+        toast.error(data.message)
+      }
     } catch (error) {
-      console.error("Error updating booking status:", error);
+      toast.error(error.message)
     }
   };
 
@@ -66,19 +64,20 @@ const ManageBookings = () => {
                 className="border-t border-borderColor text-gray-500"
               >
                 <td className="p-3 flex items-center gap-3">
-                  <img
-                    src={`${API_BASE}/uploads/cars/${booking.car.image}`}
+                  <img 
+                    src={booking.image}
                     alt=""
                     className="h-12 w-12 aspect-square rounded-md object-cover"
                   />
                   <p className="font-medium max-md:hidden">
-                    {booking.car.brand} {booking.car.model}
+                    {booking.brand_name} {booking.model_name}
+
                   </p>
                 </td>
 
                 <td className="p-3 max-md:hidden">
-                  {booking.pickupDate.split("T")[0]} to{" "}
-                  {booking.returnDate.split("T")[0]}
+                  {booking.pickup_date.split("T")[0]} to{" "}
+                  {booking.return_date.split("T")[0]}
                 </td>
 
                 <td className="p-3">
@@ -97,7 +96,7 @@ const ManageBookings = () => {
                     <select
                       value={booking.status}
                       onChange={(e) =>
-                        updateBookingStatus(booking.booking_id, e.target.value)
+                        changeBookingStatus(booking.booking_id, e.target.value)
                       }
                       className="px-2 py-1.5 mt-1 text-gray-500 border border-borderColor rounded-md outline-none"
                     >

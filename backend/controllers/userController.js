@@ -37,6 +37,7 @@ const register = (req, res) => {
           );
 
           res.status(201).json({
+            success: true,
             message: "User registered successfully",
             userId: result.insertId,
             firstName,
@@ -77,6 +78,7 @@ const login = (req, res) => {
       );
 
       res.json({
+        success: true,
         message: "Login successful",
         token,
         userId:user.user_id
@@ -107,7 +109,7 @@ const getCars = (req, res) => {
     const sql = `
         SELECT * 
         FROM cars 
-        WHERE isAvailable = 1
+        WHERE is_available = 1
     `;
 
     db.query(sql, function (err, cars) {
