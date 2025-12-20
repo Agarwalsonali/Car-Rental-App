@@ -1,157 +1,165 @@
-🚗 Car Rental Management System
+# 🚗 Car Rental Management System
 
-A full-stack Car Rental Management System that allows users to browse available cars, make bookings, and manage rentals, while providing owners/admins with control over car listings and bookings.
-This project is built to demonstrate real-world full-stack development skills using modern web technologies.
+A full-stack **Car Rental Management System** that allows users to browse available cars, make bookings, and manage rentals, while providing owners/admins with control over car listings and bookings.
 
-📌 Features
-👤 User Features
+This project demonstrates **real-world full-stack web development** using modern technologies.
 
-User registration and login with JWT authentication
+---
 
-Browse available cars
+## 📌 Features
 
-Search cars by pickup location and date
+### 👤 User Features
+- User registration and login with JWT authentication
+- Browse available cars
+- Search cars by pickup location and date
+- Book cars for selected dates
+- View personal booking history
+- Secure logout
 
-Book cars for selected dates
+### 🚘 Owner / Admin Features
+- Add new cars
+- Update car details
+- Remove car listings
+- View all bookings
+- Role-based access for owners
 
-View personal booking history
+---
 
-Secure logout
+## 🛠 Tech Stack
 
-🚘 Owner / Admin Features
+### Frontend
+- React.js (Vite)
+- React Router
+- Axios
+- React Context API
+- React Toastify
+- CSS / Tailwind CSS
 
-Add new cars
+### Backend
+- Node.js
+- Express.js
+- JWT (JSON Web Token)
 
-Update car details
+### Database
+- MySQL
 
-Remove car listings
+---
 
-View all bookings
+## 🔐 Authentication & Authorization
+- JWT-based authentication
+- Role-based access control (User / Owner)
+- Protected routes
+- Secure API endpoints
 
-Owner role-based access
+---
 
-🛠 Tech Stack
-Frontend
+## 📂 Project Structure
 
-React.js (Vite)
-
-React Router
-
-Axios
-
-React Context API
-
-React Toastify
-
-CSS / Tailwind CSS (if used)
-
-Backend
-
-Node.js
-
-Express.js
-
-JWT (JSON Web Token) Authentication
-
-Database
-
-MySQL
-
-🔐 Authentication & Authorization
-
-JWT-based authentication
-
-Role-based access control (User / Owner)
-
-Protected routes for authenticated users
-
-Secure API endpoints
-
-📂 Project Structure (Simplified)
 Car-Rental-Management-System/
 │
 ├── frontend/
-│   ├── src/
-│   ├── components/
-│   ├── context/
-│   └── pages/
+│ ├── src/
+│ ├── components/
+│ ├── context/
+│ └── pages/
 │
 ├── backend/
-│   ├── routes/
-│   ├── controllers/
-│   ├── middleware/
-│   └── models/
+│ ├── routes/
+│ ├── controllers/
+│ ├── middleware/
+│ └── models/
 │
 └── README.md
 
-⚙️ Environment Variables
-Frontend (.env)
+
+
+---
+
+## ⚙️ Environment Variables
+
+### Frontend (`.env`)
+```env
 VITE_API_URL=http://localhost:3000
 VITE_CURRENCY=₹
 
+--- 
+
 Backend (.env)
-PORT=3000
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=car_rental
-JWT_SECRET=your_secret_key
+- PORT=3000
+- DB_HOST=localhost
+- DB_USER=root
+- DB_PASSWORD=your_password
+- DB_NAME=car_rental
+- JWT_SECRET=your_secret_key
+
+---
 
 🚀 How to Run the Project
+
 1️⃣ Clone the Repository
+
 git clone https://github.com/your-username/car-rental-management-system.git
 
+
 2️⃣ Backend Setup
+
 cd backend
 npm install
 npm start
 
+
 3️⃣ Frontend Setup
+
 cd frontend
 npm install
 npm run dev
 
+---
+
+
 🧪 API Endpoints (Sample)
-Method	Endpoint	Description
-POST	/api/user/login	User login
-GET	/api/user/data	Get logged-in user
-GET	/api/cars	Get all cars
-POST	/api/bookings	Create booking
+
+| Method | Endpoint        | Description        |
+| ------ | --------------- | ------------------ |
+| POST   | /api/user/login | User login         |
+| GET    | /api/user/data  | Get logged-in user |
+| GET    | /api/cars       | Get all cars       |
+| POST   | /api/bookings   | Create booking     |
+
+
+---
+
 
 🎯 Learning Outcomes
 
-Full-stack application development
+- Full-stack application development
 
-JWT authentication & authorization
+- JWT authentication and authorization
 
-RESTful API design
+- RESTful API design
 
-MySQL database integration
+- MySQL database integration
 
-React Context for global state management
+- Global state management using React Context
 
-Real-world project structure
+- Industry-style project structure
+
+
+---
+
 
 🌱 Future Improvements
 
-Payment gateway integration
+- Payment gateway integration
 
-Car availability calendar
+- Car availability calendar
 
-Admin dashboard analytics
+- Admin dashboard analytics
 
-Email notifications
+- Email notifications
 
-Mobile responsiveness improvements
+- Improved mobile responsiveness
 
-👩‍💻 Author
-
-Sonali Agarwal
-B.Tech (Computer Science) – Central University of Rajasthan
-
-GitHub: https://github.com/Agarwalsonali
-
-LinkedIn: https://www.linkedin.com/in/sonali-agarwal-313b22292
 
 ⭐ Acknowledgements
 
