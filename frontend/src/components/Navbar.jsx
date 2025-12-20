@@ -12,7 +12,15 @@ export default function Navbar() {
   const location = useLocation();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
-  
+  const [userType,setUserType] = useState("User"); 
+
+  useEffect(()=>{
+    const u = localStorage.getItem("userType");
+    if(u){
+      setUserType(u);
+    }
+  },[])
+
   const changeRole = async () => {
   try {
     const { data } = await axios.post('/api/owner/change-role');
@@ -85,12 +93,13 @@ export default function Navbar() {
         {/* Right buttons */}
         <div className="flex max-sm:flex-col items-start sm:items-center gap-6">
             <>
-              <button
+             {userType ==='Owner' ? <button
                 onClick={() => isOwner ? nav("/owner") : changeRole()}
                 className="cursor-pointer hover:text-primary font-medium"
               >
-                {isOwner ? 'Dashboard' : 'List cars'}
-              </button>
+               Dashboard
+              </button> : <></>}
+              
 
               <button
                 onClick={()=> {user ? logout() : setShowLogin(true)}}

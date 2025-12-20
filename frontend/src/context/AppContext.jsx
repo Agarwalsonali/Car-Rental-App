@@ -36,7 +36,12 @@ export const AppProvider = ({children}) =>{
                 setIsOwner(false)
             }
         }catch(error){
-            toast.error(error.message)
+            if (error.response?.status === 403) {
+                setUser(null)
+                setIsOwner(false)
+                return
+            }
+            toast.error(error.response?.data?.message || "Something went wrong")
         }
     }
 

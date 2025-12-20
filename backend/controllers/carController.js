@@ -44,14 +44,13 @@ const addCar = async (req, res) => {
 
     console.log("Received Body:", req.body);
 
-
     const owner_id = req.user.id || req.user._id;
 
-    if ([brand, model, year, pricePerDay, category].some(v => v === undefined || v === null || v === "")) {
+    if ([brand, model, year, pricePerDay, category].some(v => !v)) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-
+    // Image upload
     let imageUrl = null;
 
     if (req.file) {
@@ -72,7 +71,6 @@ const addCar = async (req, res) => {
         ]
       });
 
-      // Remove local file
       try {
         fs.unlinkSync(filePath);
       } catch (err) {
@@ -80,50 +78,44 @@ const addCar = async (req, res) => {
       }
     }
 
-    getOrCreateId("brand", "brand_name", brand, (err, brandId) => {
-      if (err) return res.status(500).json({ error: err.message });
+    const img = imageUrl || "default_car.jpg";
 
-      getOrCreateId("models", "model_name", model, (err2, modelId) => {
-        if (err2) return res.status(500).json({ error: err2.message });
+    const sql = `
+      CALL add_car(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCarId);
+      SELECT @newCarId AS car_id;
+    `;
 
-        const sql = `
-          INSERT INTO cars (
-            owner_id, brand_id, model_id, year, category, seating_capacity,
-            fuel_type, transmission, price_per_day, location, description,
-            image, is_available
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
+    const params = [
+      owner_id,
+      brand,
+      model,
+      year,
+      category,
+      seating_capacity,
+      fuel_type,
+      transmission,
+      pricePerDay,
+      location,
+      description,
+      img
+    ];
 
-        const values = [
-          owner_id,
-          brandId,
-          modelId,
-          year,
-          category,
-          seating_capacity,
-          fuel_type,
-          transmission,
-          pricePerDay,
-          location,
-          description,
-          imageUrl || "default_car.jpg",
-          1
-        ];
+    db.query(sql, params, (err, results) => {
+      if (err) {
+        console.error("Procedure error:", err);
+        return res.status(500).json({ error: err.message });
+      }
 
-        db.query(sql, values, (err3, result) => {
-          if (err3) {
-            console.error("Car insert failed:", err3);
-            return res.status(500).json({ error: err3.message });
-          }
+      // results[1] contains the SELECT result
+      const car_id = results[1][0].car_id;
 
-          res.json({
-            success: true,
-            message: "Car added successfully",
-            car_id: result.insertId
-          });
-        });
+      res.json({
+        success: true,
+        message: "Car added successfully",
+        car_id
       });
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
@@ -131,86 +123,52 @@ const addCar = async (req, res) => {
 };
 
 
+
 // Get all cars
 const getCars = (req, res) => {
-  const query = `
-    SELECT 
-      c.car_id,
-      b.brand_name AS brand,
-      m.model_name AS model,
-      c.image,
-      c.year,
-      c.category,
-      c.seating_capacity,
-      c.fuel_type,
-      c.transmission,
-      c.price_per_day,
-      c.location,
-      c.description,
-      c.is_available,
-      c.created_at
-    FROM cars c
-    LEFT JOIN brand b ON c.brand_id = b.brand_id
-    LEFT JOIN models m ON c.model_id = m.model_id
-    WHERE c.is_available = 1
-  `;
 
-  db.query(query, (err, results) => {
+  db.query("CALL get_available_cars();", (err, results) => {
     if (err) {
       console.error("Error fetching cars:", err);
-      return res.json({ success: false, message: "Database query failed" });
+      return res.json({
+        success: false,
+        message: "Database query failed"
+      });
     }
+
+    const cars = results[0];
 
     return res.json({
       success: true,
-      cars: results
+      cars
     });
   });
+
 };
 
 
 
-// Get car by ID
- const getCarById = (req, res) => {
 
+// Get car by ID
+const getCarById = (req, res) => {
   const { id } = req.params;
 
-  const query = `
-    SELECT 
-      c.car_id, 
-      c.owner_id, 
-      b.brand_name AS brand, 
-      m.model_name AS model, 
-      c.image, 
-      c.year, 
-      c.category, 
-      c.seating_capacity, 
-      c.fuel_type, 
-      c.transmission, 
-      c.price_per_day AS pricePerDay, 
-      c.location, 
-      c.description, 
-      c.is_available AS is_available, 
-      c.created_at AS createdAt
-    FROM cars c
-    JOIN brand b ON c.brand_id = b.brand_id
-    JOIN models m ON c.model_id = m.model_id
-    WHERE c.car_id = ?
-  `;
-
-  db.query(query, [id], (err, results) => {
+  db.query("CALL get_car_by_id(?);", [id], (err, results) => {
     if (err) {
       console.error("Error fetching car by ID:", err);
       return res.status(500).json({ error: "Internal Server Error" });
     }
 
-    if (results.length === 0) {
+    const car = results[0][0]; 
+
+    if (!car) {
       return res.status(404).json({ message: "Car not found" });
     }
 
-    res.json(results[0]);
+    res.json(car);
   });
 };
+
 
 
 // Update car availability (status toggle)

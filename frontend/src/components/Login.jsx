@@ -36,6 +36,13 @@ const Login = () => {
         // store token and navigate
         setToken(data.token);
         localStorage.setItem("token", data.token);
+        if(email == "agarwalsonali922@gmail.com"){
+          localStorage.setItem("userType","Owner");
+        }
+        else {
+          localStorage.setItem("userType","User");
+        }
+
         setShowLogin(false);
         nav("/");
         resetForm();

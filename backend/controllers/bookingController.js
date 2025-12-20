@@ -79,8 +79,11 @@ const createBooking = (req, res) => {
         if (!is_available) {
             return res.json({ success: false, message: "Car is not available" });
         }
-
-        const sqlCar = `SELECT * FROM cars WHERE car_id = ?`;
+        
+        try {
+              const sqlCar = `SELECT * FROM cars WHERE car_id = ?`;
+        db.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+        db.beginTransaction();
 
         db.query(sqlCar, [car], function (err, carRows) {
             if (err) {
@@ -124,7 +127,14 @@ const createBooking = (req, res) => {
                     });
                 }
             );
+
+            db.commit();
         });
+        } catch (error) {
+            db.rollback();
+            console.log(error);
+            
+        }
     });
 };
 
@@ -133,28 +143,12 @@ const createBooking = (req, res) => {
 const getUserBookings = (req, res) => {
     const user_id = req.user.id;
 
-    const sql = `
-        SELECT 
-            b.booking_id, b.car_id, b.user_id, b.owner_id,
-            b.pickup_date, b.return_date, b.status, b.price, 
-            b.created_at, b.updated_at,
+    db.query("CALL get_user_bookings(?);", [user_id], (err, results) => {
+        if (err) {
+            return res.json({ success: false, message: err.message });
+        }
 
-            c.image, c.year, c.category, c.location,
-
-            b_tbl.brand_name,
-            m_tbl.model_name
-
-        FROM bookings b
-        JOIN cars c ON b.car_id = c.car_id
-        JOIN brand b_tbl ON c.brand_id = b_tbl.brand_id
-        JOIN models m_tbl ON c.model_id = m_tbl.model_id
-
-        WHERE b.user_id = ?
-        ORDER BY b.created_at DESC
-    `;
-
-    db.query(sql, [user_id], function (err, bookings) {
-        if (err) return res.json({ success: false, message: err.message });
+        const bookings = results[0];
 
         res.json({ success: true, bookings });
     });
@@ -164,39 +158,22 @@ const getUserBookings = (req, res) => {
 
 //API to list owner bookings
 const getOwnerBookings = (req, res) => {
-
     console.log("Decoded user:", req.user);
 
     if (req.user.role !== 'owner') {
         return res.json({ success: false, message: "Unauthorized" });
     }
 
-    const ownerId = req.user.id;  
+    const ownerId = req.user.id;
 
-
-
-    const sql = `
-        SELECT 
-            b.*, 
-            c.*, 
-            u.user_id AS booking_user_id,
-            u.fname AS user_firstname,
-            u.lname AS user_lastname,
-            u.email AS user_email
-        FROM bookings b
-        JOIN cars c ON b.car_id = c.car_id
-        JOIN users u ON b.user_id = u.user_id
-        WHERE b.owner_id = ?
-        ORDER BY b.created_at DESC
-    `;
-
-    db.query(sql, [ownerId], function (err, bookings) {
+    db.query("CALL get_owner_bookings(?);", [ownerId], (err, results) => {
         if (err) {
             console.log(err);
             return res.json({ success: false, message: err.message });
         }
 
-      
+        const bookings = results[0];
+
         res.json({
             success: true,
             bookings
@@ -210,6 +187,7 @@ const getOwnerBookings = (req, res) => {
 const changeBookingStatus = (req, res) => {
     const ownerId = req.user.id;   
     const { bookingId, status } = req.body;
+
 
     const sqlFind = `
         SELECT * FROM bookings WHERE booking_id = ?
