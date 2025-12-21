@@ -80,41 +80,72 @@ const addCar = async (req, res) => {
 
     const img = imageUrl || "default_car.jpg";
 
-    const sql = `
-      CALL add_car(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @newCarId);
-      SELECT @newCarId AS car_id;
-    `;
+    const addCar = (req, res) => {
+  const {
+    owner_id,
+    brand,
+    model,
+    year,
+    category,
+    seating_capacity,
+    fuel_type,
+    transmission,
+    pricePerDay,
+    location,
+    description,
+    img
+  } = req.body;
 
-    const params = [
+  const sql = `
+    INSERT INTO cars (
       owner_id,
-      brand,
-      model,
+      brand_id,
+      model_id,
       year,
       category,
       seating_capacity,
       fuel_type,
       transmission,
-      pricePerDay,
+      price_per_day,
       location,
       description,
-      img
-    ];
+      image,
+      is_available
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `;
 
-    db.query(sql, params, (err, results) => {
-      if (err) {
-        console.error("Procedure error:", err);
-        return res.status(500).json({ error: err.message });
-      }
+  const params = [
+    owner_id,
+    brand,
+    model,
+    year,
+    category,
+    seating_capacity,
+    fuel_type,
+    transmission,
+    pricePerDay,
+    location,
+    description,
+    img
+  ];
 
-      // results[1] contains the SELECT result
-      const car_id = results[1][0].car_id;
-
-      res.json({
-        success: true,
-        message: "Car added successfully",
-        car_id
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error("DB ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to add car",
+        error: err.message
       });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Car added successfully",
+      car_id: result.insertId
     });
+  });
+};
 
   } catch (error) {
     console.error(error);
@@ -125,28 +156,27 @@ const addCar = async (req, res) => {
 
 
 // Get all cars
+
 const getCars = (req, res) => {
+  const sql = "SELECT * FROM cars WHERE is_available = 1";
 
-  db.query("CALL get_available_cars();", (err, results) => {
+  db.query(sql, (err, results) => {
     if (err) {
-  console.error("DB ERROR:", err);
-  return res.status(500).json({
-    success: false,
-    message: "Database query failed",
-    error: err.message
-  });
-}
+      console.error("DB ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Database query failed",
+        error: err.message
+      });
+    }
 
-
-    const cars = results[0];
-
-    return res.json({
+    return res.status(200).json({
       success: true,
-      cars
+      data: results
     });
   });
-
 };
+
 
 
 
@@ -155,21 +185,32 @@ const getCars = (req, res) => {
 const getCarById = (req, res) => {
   const { id } = req.params;
 
-  db.query("CALL get_car_by_id(?);", [id], (err, results) => {
+  const sql = "SELECT * FROM cars WHERE car_id = ?";
+
+  db.query(sql, [id], (err, results) => {
     if (err) {
-      console.error("Error fetching car by ID:", err);
-      return res.status(500).json({ error: "Internal Server Error" });
+      console.error("DB ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Database query failed",
+        error: err.message
+      });
     }
 
-    const car = results[0][0]; 
-
-    if (!car) {
-      return res.status(404).json({ message: "Car not found" });
+    if (results.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Car not found"
+      });
     }
 
-    res.json(car);
+    return res.status(200).json({
+      success: true,
+      data: results[0]
+    });
   });
 };
+
 
 
 

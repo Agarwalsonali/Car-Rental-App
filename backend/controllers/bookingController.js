@@ -139,47 +139,103 @@ const createBooking = (req, res) => {
 };
 
 
-//API to list user bookings
+// API to list user bookings
 const getUserBookings = (req, res) => {
-    const user_id = req.user.id;
+  const user_id = req.user.id;
 
-    db.query("CALL get_user_bookings(?);", [user_id], (err, results) => {
-        if (err) {
-            return res.json({ success: false, message: err.message });
-        }
+  const sql = `
+    SELECT 
+      b.booking_id,
+      b.pickup_date,
+      b.return_date,
+      b.status,
+      b.price,
+      b.created_at,
+      c.car_id,
+      c.image,
+      c.category,
+      c.price_per_day,
+      br.brand_name,
+      m.model_name
+    FROM bookings b
+    JOIN cars c ON b.car_id = c.car_id
+    JOIN brand br ON c.brand_id = br.brand_id
+    JOIN models m ON c.model_id = m.model_id
+    WHERE b.user_id = ?
+    ORDER BY b.created_at DESC
+  `;
 
-        const bookings = results[0];
-
-        res.json({ success: true, bookings });
-    });
-};
-
-
-
-//API to list owner bookings
-const getOwnerBookings = (req, res) => {
-    console.log("Decoded user:", req.user);
-
-    if (req.user.role !== 'owner') {
-        return res.json({ success: false, message: "Unauthorized" });
+  db.query(sql, [user_id], (err, results) => {
+    if (err) {
+      console.error("DB ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch user bookings",
+        error: err.message
+      });
     }
 
-    const ownerId = req.user.id;
-
-    db.query("CALL get_owner_bookings(?);", [ownerId], (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.json({ success: false, message: err.message });
-        }
-
-        const bookings = results[0];
-
-        res.json({
-            success: true,
-            bookings
-        });
+    res.status(200).json({
+      success: true,
+      bookings: results
     });
+  });
 };
+
+
+
+// API to list owner bookings
+const getOwnerBookings = (req, res) => {
+  if (req.user.role !== "owner") {
+    return res.status(403).json({
+      success: false,
+      message: "Unauthorized"
+    });
+  }
+
+  const ownerId = req.user.id;
+
+  const sql = `
+    SELECT 
+      b.booking_id,
+      b.pickup_date,
+      b.return_date,
+      b.status,
+      b.price,
+      b.created_at,
+      u.fname,
+      u.lname,
+      c.car_id,
+      c.image,
+      c.category,
+      br.brand_name,
+      m.model_name
+    FROM bookings b
+    JOIN cars c ON b.car_id = c.car_id
+    JOIN users u ON b.user_id = u.user_id
+    JOIN brand br ON c.brand_id = br.brand_id
+    JOIN models m ON c.model_id = m.model_id
+    WHERE c.owner_id = ?
+    ORDER BY b.created_at DESC
+  `;
+
+  db.query(sql, [ownerId], (err, results) => {
+    if (err) {
+      console.error("DB ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch owner bookings",
+        error: err.message
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      bookings: results
+    });
+  });
+};
+
 
 
 
