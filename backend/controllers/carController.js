@@ -129,12 +129,14 @@ const getCars = (req, res) => {
 
   db.query("CALL get_available_cars();", (err, results) => {
     if (err) {
-      console.error("Error fetching cars:", err);
-      return res.json({
-        success: false,
-        message: "Database query failed"
-      });
-    }
+  console.error("DB ERROR:", err);
+  return res.status(500).json({
+    success: false,
+    message: "Database query failed",
+    error: err.message
+  });
+}
+
 
     const cars = results[0];
 

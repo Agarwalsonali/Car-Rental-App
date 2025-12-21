@@ -21,6 +21,13 @@ const app = express();
 //     credentials:true
 // }))
 
+app.get('/',(req,res)=>{
+    res.json({
+        message: "Car Rental Management API Running"
+    })
+})
+
+
 app.use(cors({
     origin:"*",
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -39,11 +46,6 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/agreements", agreementRoutes);
 
-app.get('/',(req,res)=>{
-    res.json({
-        message: "Car Rental Management API Running"
-    })
-})
 
 app.use((err, req, res, next) => {
   console.error("Express error:", err);
